@@ -9,6 +9,8 @@ import os
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from src.db.repository import save_raw_message, count_events
+
 
 # Load .env so the token is available via os.getenv
 load_dotenv()
@@ -34,10 +36,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handler for any plain text message — acknowledge receipt (logging comes next)."""
+    """Persist any text message as a raw event, then confirm honestly."""
     text = update.message.text
-    logger.info("Received message: %s", text)
-    await update.message.reply_text(f"Got it, noted: \u201c{text}\u201d ✅")
+    user_id = str(update.effective_user.id)
+    row_id = save_raw_message(user_id=user_id, raw_text=text)
+    total = count_events(user_id)
+    logger.info("Received and saved message (event #%s): %s", row_id, text)
+    await update.message.reply_text(
+        f"Logged ✅ (event #{row_id} — you've logged {total} so far)"
+    )
 
 
 def main() -> None:
