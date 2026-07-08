@@ -5,6 +5,8 @@ v0.1 scope: receive messages, reply, log raw text to the events table.
 
 import logging
 import os
+from src.db.repository import save_raw_message, count_events, save_parsed_events
+from src.ingestion.parser import parse_message
 
 from dotenv import load_dotenv
 from telegram import Update
@@ -36,15 +38,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Persist any text message as a raw event, then confirm honestly."""
+    """Parse the message into structured events; fall back to raw storage."""
     text = update.message.text
     user_id = str(update.effective_user.id)
-    row_id = save_raw_message(user_id=user_id, raw_text=text)
-    total = count_events(user_id)
-    logger.info("Received and saved message (event #%s): %s", row_id, text)
-    await update.message.reply_text(
-        f"Logged ✅ (event #{row_id} — you've logged {total} so far)"
-    )
+
+    events = parse_message(text)
+    if events:
+        ids = save_parsed_events(user_id=user_id, raw_text=text, events=events)
+        summary = "\n".join(
+            f"• {e['subject']}" + (f"/{e['topic']}" if e.get("topic") else "") +
+            f" — {e['activity']}" + (f" ×{e['count']}" if e.get("count") else "")
+            for e in events
+        )
+        await update.message.reply_text(f"Understood — logged {len(ids)} event(s) ✅\n{summary}")
+    else:
+        row_id = save_raw_message(user_id=user_id, raw_text=text)
+        await update.message.reply_text(
+            f"Couldn't fully parse that, but saved it raw (event #{row_id}) — I'll understand it later 📥"
+        )
 
 
 def main() -> None:
