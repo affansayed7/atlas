@@ -9,6 +9,26 @@ from src.db.schema import get_connection
 
 logger = logging.getLogger(__name__)
 
+def save_parsed_events(user_id: str, raw_text: str, events: list[dict], source: str = "telegram") -> list[int]:
+    """Persist parsed events. Returns list of new row ids."""
+    ids = []
+    with get_connection() as conn:
+        for e in events:
+            cursor = conn.execute(
+                """
+                INSERT INTO events
+                    (user_id, subject, topic, activity, count, correct,
+                     difficulty, outcome, duration_min, raw_text, source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (user_id, e["subject"], e.get("topic"), e["activity"],
+                 e.get("count"), e.get("correct"), e.get("difficulty"),
+                 e.get("outcome"), e.get("duration_min"), raw_text, source),
+            )
+            ids.append(cursor.lastrowid)
+    logger.info("Saved %d parsed events for user=%s", len(ids), user_id)
+    return ids
+
 
 def save_raw_message(user_id: str, raw_text: str, source: str = "telegram") -> int:
     """Persist an unparsed message as a raw event. Returns the new row id.
