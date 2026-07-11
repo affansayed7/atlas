@@ -11,6 +11,7 @@ from src.viz.chart import make_subject_chart
 from datetime import datetime, timedelta, timezone
 from src.db.repository import get_active_dates
 from src.analytics.streak import calculate_streak
+from src.ingestion.leetcode import poll_and_log
 
 
 
@@ -134,6 +135,24 @@ async def streak(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
+async def sync(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler for /sync — poll LeetCode on demand and report new solves."""
+    user_id = str(update.effective_user.id)
+    await update.message.reply_text("Syncing with LeetCode... 🔄")
+
+    # poll_and_log uses blocking `requests` + sqlite. Running it directly would
+    # freeze the bot's event loop. asyncio.to_thread offloads it to a worker
+    # thread so the bot stays responsive.
+    import asyncio
+    LEETCODE_USERNAME = "NEOWMEOW"  # TODO: make per-user configurable later
+    new_solves = await asyncio.to_thread(poll_and_log, user_id, LEETCODE_USERNAME)
+
+    if new_solves:
+        detail = ", ".join(f"{n} {d}" for d, n in new_solves.items())
+        await update.message.reply_text(f"🎉 Logged new solves: {detail}")
+    else:
+        await update.message.reply_text("All caught up — no new solves since last sync ✅")
+
 
 
 def main() -> None:
@@ -155,6 +174,7 @@ def main() -> None:
     app.add_handler(CommandHandler("today", today))
     app.add_handler(CommandHandler("chart", chart))
     app.add_handler(CommandHandler("streak", streak))
+    app.add_handler(CommandHandler("sync", sync))
     logger.info("Atlas bot starting — polling for messages...")
     app.run_polling(bootstrap_retries=3)
 

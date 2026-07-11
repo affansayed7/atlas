@@ -10,6 +10,35 @@ from src.db.schema import get_connection
 logger = logging.getLogger(__name__)
 
 
+def get_latest_snapshot(user_id: str) -> dict | None:
+    """Most recent LeetCode snapshot for a user, or None if none exists."""
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT easy, medium, hard, total FROM leetcode_snapshots
+            WHERE user_id = ? ORDER BY taken_at DESC LIMIT 1
+            """,
+            (user_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return {"Easy": row[0], "Medium": row[1], "Hard": row[2], "All": row[3]}
+
+
+def save_snapshot(user_id: str, username: str, counts: dict) -> None:
+    """Store a LeetCode snapshot."""
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO leetcode_snapshots (user_id, username, total, easy, medium, hard)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (user_id, username, counts.get("All", 0), counts.get("Easy", 0),
+             counts.get("Medium", 0), counts.get("Hard", 0)),
+        )
+    logger.info("Saved LeetCode snapshot for user=%s: %s", user_id, counts)
+
+
 def get_active_dates(user_id: str) -> list[str]:
     """Distinct dates (IST, 'YYYY-MM-DD') the user logged something, newest first."""
     with get_connection() as conn:
