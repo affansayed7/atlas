@@ -10,6 +10,21 @@ from src.db.schema import get_connection
 logger = logging.getLogger(__name__)
 
 
+def get_active_dates(user_id: str) -> list[str]:
+    """Distinct dates (IST, 'YYYY-MM-DD') the user logged something, newest first."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT date(timestamp, '+5 hours', '+30 minutes') AS ist_date
+            FROM events
+            WHERE user_id = ? AND subject != 'unparsed'
+            ORDER BY ist_date DESC
+            """,
+            (user_id,),
+        ).fetchall()
+    return [r[0] for r in rows]
+
+
 def get_today_events(user_id: str) -> list[dict]:
     """Events logged 'today' in IST (not UTC).
 
