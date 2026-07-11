@@ -9,6 +9,29 @@ from src.db.schema import get_connection
 
 logger = logging.getLogger(__name__)
 
+
+def get_summary(user_id: str) -> list[dict]:
+    """Aggregate events per subject for a user. Returns list of dicts."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT subject,
+                   COUNT(*)              AS event_count,
+                   SUM(COALESCE(count, 0))     AS total_count,
+                   SUM(COALESCE(duration_min, 0)) AS total_minutes
+            FROM events
+            WHERE user_id = ? AND subject != 'unparsed'
+            GROUP BY subject
+            ORDER BY event_count DESC
+            """,
+            (user_id,),
+        ).fetchall()
+    return [
+        {"subject": r[0], "events": r[1], "items": r[2], "minutes": r[3]}
+        for r in rows
+    ]
+
+
 def save_parsed_events(user_id: str, raw_text: str, events: list[dict], source: str = "telegram") -> list[int]:
     """Persist parsed events. Returns list of new row ids."""
     ids = []

@@ -5,13 +5,16 @@ v0.1 scope: receive messages, reply, log raw text to the events table.
 
 import logging
 import os
-from src.db.repository import save_raw_message, count_events, save_parsed_events
+from src.db.repository import get_summary, save_raw_message, save_parsed_events
 from src.ingestion.parser import parse_message
 
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-from src.db.repository import save_raw_message, count_events
+
+def _plural(n: int, word: str) -> str:
+    """Return '1 session' / '2 sessions' — handles singular/plural."""
+    return f"{n} {word}{'' if n == 1 else 's'}"
 
 
 # Load .env so the token is available via os.getenv
@@ -57,6 +60,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             f"Couldn't fully parse that, but saved it raw (event #{row_id}) — I'll understand it later 📥"
         )
 
+async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler for /summary — Atlas reports the user's totals per subject."""
+    user_id = str(update.effective_user.id)
+    data = get_summary(user_id)
+    if not data:
+        await update.message.reply_text("No logs yet — send me what you studied and I'll start tracking! 📊")
+        return
+
+    lines = ["📊 *Your Atlas summary:*\n"]
+    for d in data:
+        line = f"• *{d['subject']}* — {_plural(d['events'], 'session')}"
+        if d["items"]:
+            line += f", {_plural(d['items'], 'item')}"
+        if d["minutes"]:
+            line += f", {d['minutes']} min"
+        lines.append(line)
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
 
 def main() -> None:
     """Build and run the bot (long polling)."""
@@ -73,7 +94,7 @@ def main() -> None:
     )
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
+    app.add_handler(CommandHandler("summary", summary))
     logger.info("Atlas bot starting — polling for messages...")
     app.run_polling(bootstrap_retries=3)
 
