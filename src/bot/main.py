@@ -8,6 +8,11 @@ import os
 from src.db.repository import get_today_events, get_summary, save_raw_message, save_parsed_events
 from src.ingestion.parser import parse_message
 from src.viz.chart import make_subject_chart
+from datetime import datetime, timedelta, timezone
+from src.db.repository import get_active_dates
+from src.analytics.streak import calculate_streak
+
+
 
 from dotenv import load_dotenv
 from telegram import Update
@@ -112,6 +117,24 @@ async def chart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_photo(photo=buf, caption="📊 Your sessions per subject")
 
 
+async def streak(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler for /streak — consecutive logging days (IST)."""
+    user_id = str(update.effective_user.id)
+    active_dates = get_active_dates(user_id)
+
+    # 'Today' in IST = UTC + 5:30
+    ist_today = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).date()
+    days = calculate_streak(active_dates, ist_today)
+
+    if days == 0:
+        await update.message.reply_text("No streak yet — log something today to start one! 🔥")
+    else:
+        await update.message.reply_text(
+            f"🔥 *{days}-day streak!* Keep it going.", parse_mode="Markdown"
+        )
+
+
+
 
 def main() -> None:
     """Build and run the bot (long polling)."""
@@ -131,6 +154,7 @@ def main() -> None:
     app.add_handler(CommandHandler("summary", summary))
     app.add_handler(CommandHandler("today", today))
     app.add_handler(CommandHandler("chart", chart))
+    app.add_handler(CommandHandler("streak", streak))
     logger.info("Atlas bot starting — polling for messages...")
     app.run_polling(bootstrap_retries=3)
 
