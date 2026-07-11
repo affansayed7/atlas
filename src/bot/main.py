@@ -5,7 +5,7 @@ v0.1 scope: receive messages, reply, log raw text to the events table.
 
 import logging
 import os
-from src.db.repository import get_summary, save_raw_message, save_parsed_events
+from src.db.repository import get_today_events, get_summary, save_raw_message, save_parsed_events
 from src.ingestion.parser import parse_message
 
 from dotenv import load_dotenv
@@ -79,6 +79,26 @@ async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
+async def today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler for /today — what the user logged today (IST)."""
+    user_id = str(update.effective_user.id)
+    events = get_today_events(user_id)
+    if not events:
+        await update.message.reply_text("Nothing logged today yet — the day's young! 📅")
+        return
+
+    lines = [f"📅 *Today's log* ({len(events)} events):\n"]
+    for e in events:
+        line = f"• *{e['subject']}*"
+        if e["topic"]:
+            line += f"/{e['topic']}"
+        line += f" — {e['activity']}"
+        if e["count"]:
+            line += f" ×{e['count']}"
+        lines.append(line)
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
 def main() -> None:
     """Build and run the bot (long polling)."""
     if not TOKEN:
@@ -95,6 +115,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CommandHandler("summary", summary))
+    app.add_handler(CommandHandler("today", today))
     logger.info("Atlas bot starting — polling for messages...")
     app.run_polling(bootstrap_retries=3)
 
