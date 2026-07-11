@@ -7,6 +7,7 @@ import logging
 import os
 from src.db.repository import get_today_events, get_summary, save_raw_message, save_parsed_events
 from src.ingestion.parser import parse_message
+from src.viz.chart import make_subject_chart
 
 from dotenv import load_dotenv
 from telegram import Update
@@ -99,6 +100,19 @@ async def today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
+async def chart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler for /chart — sends a bar chart of sessions per subject."""
+    user_id = str(update.effective_user.id)
+    data = get_summary(user_id)
+    if not data:
+        await update.message.reply_text("No data to chart yet — log something first! 📊")
+        return
+
+    buf = make_subject_chart(data)
+    await update.message.reply_photo(photo=buf, caption="📊 Your sessions per subject")
+
+
+
 def main() -> None:
     """Build and run the bot (long polling)."""
     if not TOKEN:
@@ -116,6 +130,7 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CommandHandler("summary", summary))
     app.add_handler(CommandHandler("today", today))
+    app.add_handler(CommandHandler("chart", chart))
     logger.info("Atlas bot starting — polling for messages...")
     app.run_polling(bootstrap_retries=3)
 
