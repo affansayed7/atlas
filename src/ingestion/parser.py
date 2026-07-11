@@ -40,13 +40,16 @@ Return ONLY a JSON array. No prose, no markdown, no code fences. Each element:
 Rules:
 - A message with multiple activities returns multiple array elements.
 - Never invent values not stated in the message. Missing = null.
+- Only extract COMPLETED activities. IGNORE intentions, plans, or future
+  tense ("will do", "planning to", "later today", "tomorrow I'll").
 - Aptitude/quant topics (percentages, time-and-distance, boats-streams) → subject "apti".
 - Exercise/workout content → subject "gym", activity "trained".
 - If nothing extractable, return [].
 
 Example input: "today did 20 apti questions got 16 right and gym 1hr push day"
+Example output: [{"subject":"apti","topic":null,"activity":"solved","count":20,"correct":16,"difficulty":null,"outcome":null,"duration_min":null},{"subject":"gym","topic":"push day","activity":"trained","count":null,"correct":null,"difficulty":null,"outcome":null,"duration_min":60}]
+Example input: "today did 20 apti questions got 16 right and gym 1hr push day, will solve dsa later tonight"
 Example output: [{"subject":"apti","topic":null,"activity":"solved","count":20,"correct":16,"difficulty":null,"outcome":null,"duration_min":null},{"subject":"gym","topic":"push day","activity":"trained","count":null,"correct":null,"difficulty":null,"outcome":null,"duration_min":60}]"""
-
 
 def parse_message(raw_text: str) -> list[dict]:
     """Extract structured events from a raw message. Returns [] on any failure."""
