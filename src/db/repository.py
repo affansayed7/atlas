@@ -10,6 +10,34 @@ from src.db.schema import get_connection
 logger = logging.getLogger(__name__)
 
 
+def get_today_events(user_id: str) -> list[dict]:
+    """Events logged 'today' in IST (not UTC).
+
+    Timestamps are stored in UTC. We shift both the stored timestamp and
+    'now' by +5:30 to IST before comparing dates, so a 2 AM IST log counts
+    as today, not yesterday.
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT subject, topic, activity, count, raw_text,
+                   datetime(timestamp, '+5 hours', '+30 minutes') AS ist_time
+            FROM events
+            WHERE user_id = ?
+              AND subject != 'unparsed'
+              AND date(timestamp, '+5 hours', '+30 minutes') = date('now', '+5 hours', '+30 minutes')
+            ORDER BY timestamp DESC
+            """,
+            (user_id,),
+        ).fetchall()
+    return [
+        {"subject": r[0], "topic": r[1], "activity": r[2], "count": r[3],
+         "raw_text": r[4], "ist_time": r[5]}
+        for r in rows
+    ]
+
+
+
 def get_summary(user_id: str) -> list[dict]:
     """Aggregate events per subject for a user. Returns list of dicts."""
     with get_connection() as conn:
