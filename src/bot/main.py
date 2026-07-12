@@ -185,6 +185,25 @@ async def mastery(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler for /help — lists everything Atlas can do."""
+    text = (
+        "🗺️ *Atlas — your learning coach*\n\n"
+        "*Logging:*\n"
+        "Just message me naturally — e.g. _\"solved 3 dp mediums, 1 struggled\"_ "
+        "or _\"gym 1hr push day\"_. I'll parse and remember it.\n\n"
+        "*Commands:*\n"
+        "/summary — totals per subject\n"
+        "/today — what you logged today\n"
+        "/streak — your current logging streak 🔥\n"
+        "/chart — sessions-per-subject bar chart 📊\n"
+        "/activity — daily activity, last 14 days 📈\n"
+        "/mastery — estimated skill mastery (BKT) 🧠\n"
+        "/sync — pull latest LeetCode solves 🔄\n"
+        "/help — this message"
+    )
+    await update.effective_message.reply_text(text, parse_mode="Markdown")
+
 
 def main() -> None:
     """Build and run the bot (long polling)."""
@@ -208,6 +227,7 @@ def main() -> None:
     app.add_handler(CommandHandler("sync", sync))
     app.add_handler(CommandHandler("activity", activity))
     app.add_handler(CommandHandler("mastery", mastery))
+    app.add_handler(CommandHandler("help", help_command))
     logger.info("Atlas bot starting — polling for messages...")
     app.run_polling(bootstrap_retries=3)
 
