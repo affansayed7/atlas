@@ -10,6 +10,33 @@ from src.db.schema import get_connection
 logger = logging.getLogger(__name__)
 
 
+def get_daily_counts(user_id: str, days: int = 14) -> list[dict]:
+    """Events per IST day for the last N days. Fills gaps with zero-count days."""
+    from datetime import datetime, timedelta, timezone
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT date(timestamp, '+5 hours', '+30 minutes') AS ist_date,
+                   COUNT(*) AS cnt
+            FROM events
+            WHERE user_id = ? AND subject != 'unparsed'
+            GROUP BY ist_date
+            """,
+            (user_id,),
+        ).fetchall()
+
+    counts_by_date = {r[0]: r[1] for r in rows}
+
+    # Build a continuous date range (last N days), filling missing days with 0
+    ist_today = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).date()
+    result = []
+    for i in range(days - 1, -1, -1):
+        d = ist_today - timedelta(days=i)
+        key = d.isoformat()
+        result.append({"date": key, "count": counts_by_date.get(key, 0)})
+    return result
+
 def get_latest_snapshot(user_id: str) -> dict | None:
     """Most recent LeetCode snapshot for a user, or None if none exists."""
     with get_connection() as conn:

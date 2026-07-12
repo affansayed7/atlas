@@ -12,6 +12,8 @@ from datetime import datetime, timedelta, timezone
 from src.db.repository import get_active_dates
 from src.analytics.streak import calculate_streak
 from src.ingestion.leetcode import poll_and_log
+from src.db.repository import get_daily_counts
+from src.viz.chart import make_activity_chart
 
 
 
@@ -153,6 +155,15 @@ async def sync(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         await update.message.reply_text("All caught up — no new solves since last sync ✅")
 
+async def activity(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler for /activity — daily activity bar chart, last 14 days."""
+    user_id = str(update.effective_user.id)
+    data = get_daily_counts(user_id, days=14)
+    if not any(d["count"] for d in data):
+        await update.effective_message.reply_text("No activity in the last 14 days — log something! 📊")
+        return
+    buf = make_activity_chart(data)
+    await update.effective_message.reply_photo(photo=buf, caption="📈 Your daily activity (last 14 days)")
 
 
 def main() -> None:
@@ -175,6 +186,7 @@ def main() -> None:
     app.add_handler(CommandHandler("chart", chart))
     app.add_handler(CommandHandler("streak", streak))
     app.add_handler(CommandHandler("sync", sync))
+    app.add_handler(CommandHandler("activity", activity))
     logger.info("Atlas bot starting — polling for messages...")
     app.run_polling(bootstrap_retries=3)
 
