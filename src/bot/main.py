@@ -14,7 +14,7 @@ from src.analytics.streak import calculate_streak
 from src.ingestion.leetcode import poll_and_log
 from src.db.repository import get_daily_counts
 from src.viz.chart import make_activity_chart
-
+from src.analytics.mastery import estimate_mastery
 
 
 from dotenv import load_dotenv
@@ -166,6 +166,26 @@ async def activity(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_photo(photo=buf, caption="📈 Your daily activity (last 14 days)")
 
 
+async def mastery(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler for /mastery — BKT-estimated mastery per subject."""
+    user_id = str(update.effective_user.id)
+    data = estimate_mastery(user_id)
+    if not data:
+        await update.effective_message.reply_text(
+            "Not enough graded attempts yet. Log solves with outcomes "
+            "(e.g. 'solved 3 dp, 1 struggled') and I'll estimate mastery. 🧠"
+        )
+        return
+
+    lines = ["🧠 *Estimated mastery* (BKT):\n"]
+    for d in data:
+        bar = "█" * round(d["mastery"] * 10) + "░" * (10 - round(d["mastery"] * 10))
+        lines.append(f"*{d['subject']}*  {bar}  {d['mastery']:.0%}  _({d['attempts']} attempts)_")
+    lines.append("\n_Estimates are rough — they sharpen with more logged attempts._")
+    await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+
 def main() -> None:
     """Build and run the bot (long polling)."""
     if not TOKEN:
@@ -187,6 +207,7 @@ def main() -> None:
     app.add_handler(CommandHandler("streak", streak))
     app.add_handler(CommandHandler("sync", sync))
     app.add_handler(CommandHandler("activity", activity))
+    app.add_handler(CommandHandler("mastery", mastery))
     logger.info("Atlas bot starting — polling for messages...")
     app.run_polling(bootstrap_retries=3)
 
