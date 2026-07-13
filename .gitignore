@@ -17,3 +17,5 @@ data/*.db
 
 # IDE settings
 .idea/
+
+data/*.csv
