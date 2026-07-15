@@ -19,16 +19,25 @@ DATA = Path(__file__).resolve().parents[2] / "data" / "skill_builder_data.csv"
 
 
 def load_and_clean() -> pd.DataFrame:
-    """Load ASSISTments, drop skill-less rows, sort chronologically."""
+    """Load ASSISTments, drop skill-less rows, DEDUPE multi-skill expansions, sort."""
     df = pd.read_csv(DATA, encoding="ISO-8859-15", low_memory=False)
     df = df[["user_id", "skill_id", "correct", "order_id"]].copy()
-    df = df.dropna(subset=["skill_id"])           # 12.6% untagged — can't trace
-    df = df[df["correct"].isin([0, 1])]           # keep clean 0/1 only
-    df = df.sort_values("order_id")               # chronological = true attempt order
+    df = df.dropna(subset=["skill_id"])
+    df = df[df["correct"].isin([0, 1])]
+
+    # CRITICAL: multi-skill problems are expanded into one row PER SKILL, sharing
+    # the same order_id. Keeping them all leaks the answer (the model would see
+    # "skill A -> correct" then be asked to predict "skill B" of the SAME attempt).
+    # Standard KT preprocessing: keep one row per attempt.
+    before = len(df)
+    df = df.drop_duplicates(subset=["order_id"], keep="first")
+    print(f"Deduped multi-skill rows: {before:,} -> {len(df):,} "
+          f"({before - len(df):,} duplicate-attempt rows removed)")
+
+    df = df.sort_values("order_id")
     print(f"After cleaning: {len(df):,} attempts, "
           f"{df['user_id'].nunique():,} students, {df['skill_id'].nunique():,} skills")
     return df
-
 
 def evaluate_bkt(df: pd.DataFrame, params: BKTParams) -> tuple[list, list]:
     """Predict each attempt from prior history (per student+skill). Returns (preds, actuals)."""
