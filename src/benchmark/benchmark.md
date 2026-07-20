@@ -89,6 +89,13 @@ from 0.39 to 0.54 — the task became genuinely hard rather than trivially copya
 | BKT — grid-search fitted | 0.6891 |
 | **DKT (LSTM) — held-out test students** | **0.7506** |
 
+==================================================
+  FAIR COMPARISON — same held-out test students
+  BKT AUC (test): 0.6913
+  DKT AUC (test): 0.7482
+  DKT - BKT:      +0.0569
+==================================================
+
 DKT train AUC: 0.7638 (healthy gap vs 0.7506 test — no significant overfitting).
 
 ---

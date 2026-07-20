@@ -142,7 +142,7 @@ def diagnose_skill_repetition(seqs, sample_size=500):
 if __name__ == "__main__":
     df = load_and_clean()
     sequences, num_skills = build_sequences(df)
-    train_seqs, test_seqs = train_test_split(sequences)
+    train_seqs, test_seqs, train_ids, test_ids = train_test_split(sequences)
 
     diagnose_padding_collision(train_seqs, num_skills)
     diagnose_skill_repetition(train_seqs)

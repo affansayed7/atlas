@@ -17,24 +17,39 @@ from src.benchmark.evaluate import load_and_clean
 
 
 def build_sequences(df):
-    """Return per-student lists of (skill_idx, correct) and skill vocab info."""
-    # Map raw skill_ids -> compact 0..N-1 indices (skill_ids are large/sparse)
+    """Return per-student (student_id, sequence) pairs and skill vocab size."""
     unique_skills = sorted(df["skill_id"].unique())
     skill_to_idx = {sid: i for i, sid in enumerate(unique_skills)}
     num_skills = len(unique_skills)
 
-    sequences = []
-    # groupby preserves per-student order since df is already sorted by order_id
-    for _uid, group in df.groupby("user_id", sort=False):
+    student_seqs = []  # list of (user_id, sequence)
+    for uid, group in df.groupby("user_id", sort=False):
         seq = [
             (skill_to_idx[sid], int(correct))
             for sid, correct in zip(group["skill_id"], group["correct"])
         ]
-        if len(seq) >= 2:            # need at least 2: one to learn from, one to predict
-            sequences.append(seq)
+        if len(seq) >= 2:
+            student_seqs.append((uid, seq))
 
-    print(f"Built {len(sequences):,} student sequences over {num_skills} skills")
-    return sequences, num_skills
+    print(f"Built {len(student_seqs):,} student sequences over {num_skills} skills")
+    return student_seqs, num_skills
+
+
+def train_test_split(student_seqs, test_frac=0.2, seed=42):
+    """Split by student. Returns (train_seqs, test_seqs, train_ids, test_ids)."""
+    import numpy as np
+    rng = np.random.default_rng(seed)
+    idx = rng.permutation(len(student_seqs))
+    n_test = int(len(student_seqs) * test_frac)
+    test_i, train_i = idx[:n_test], idx[n_test:]
+
+    train = [student_seqs[i][1] for i in train_i]
+    test = [student_seqs[i][1] for i in test_i]
+    train_ids = {student_seqs[i][0] for i in train_i}
+    test_ids = {student_seqs[i][0] for i in test_i}
+
+    print(f"Split: {len(train):,} train / {len(test):,} test students")
+    return train, test, train_ids, test_ids
 
 
 def encode_sequence(seq, num_skills):
@@ -59,22 +74,10 @@ def encode_sequence(seq, num_skills):
     )
 
 
-def train_test_split(sequences, test_frac=0.2, seed=42):
-    """Split by STUDENT (not attempt) so test students are fully unseen."""
-    rng = np.random.default_rng(seed)
-    idx = rng.permutation(len(sequences))
-    n_test = int(len(sequences) * test_frac)
-    test_idx, train_idx = idx[:n_test], idx[n_test:]
-    train = [sequences[i] for i in train_idx]
-    test = [sequences[i] for i in test_idx]
-    print(f"Split: {len(train):,} train / {len(test):,} test students")
-    return train, test
-
-
 if __name__ == "__main__":
     df = load_and_clean()
     sequences, num_skills = build_sequences(df)
-    train, test = train_test_split(sequences)
+    train, test, train_ids, test_ids = train_test_split(sequences)
 
     # Sanity check: encode one sequence and show shapes
     inp, tsk, tcorr = encode_sequence(train[0], num_skills)
